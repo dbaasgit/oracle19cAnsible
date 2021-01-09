@@ -1,0 +1,107 @@
+- name: display pre database software install message
+  remote_user: "{{ root_user }}"
+  debug:
+    msg:
+      - 'Oracle Database Software 19c Installation started for Single Instance at {{ansible_date_time.iso8601}}:'
+
+- name: create required directories
+  when: inventory_hostname in groups['dbservers']
+  remote_user: "{{ root_user }}"
+  file:
+    path="{{ item }}"
+    state=directory
+    owner="{{ oracle_user }}"
+    group="{{ oracle_install_group }}"
+    mode=0775
+  with_items:
+    - "{{ root_directory }}"
+    - "{{ scripts_directory }}"
+    - "{{ oracle_inventory }}"
+    - "{{ oracle_base }}"
+    - "{{ stage_dir }}"
+    - "{{ oracle_home }}"
+  tags:
+   - db19c_createinventory
+
+- name: Copy preinstall-19c package to target database server
+  when: inventory_hostname in groups['dbservers']
+  copy: src=roles/dbsoftware19c_install/files/{{ item }} dest={{ stage_dir }} mode=0755 owner="{{ oracle_user }}" group="{{ oracle_install_group }}"
+  with_items:
+     - oracle-database-preinstall-19c-1.0-1.el7.src.rpm
+  tags:
+   - db19c_preinstpkg
+
+- name: Execute rpm package 
+  when: inventory_hostname in groups['dbservers']
+  remote_user: "{{ root_user }}"
+  become: yes
+  command: rpm -U "/{{ stage_dir }}/{{ preinstall_pkg }}"
+  args:
+    warn: false
+  register: db19c_prerpm_install
+  tags:
+   - db19c_preinstpkg
+
+- name: Unpack Oracle 19c Database Software to the target server
+  when: inventory_hostname in groups['dbservers']
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ oracle_user }}"
+  unarchive:
+     src={{ stage_dir }}/LINUX.X64_193000_db_home.zip
+     dest="{{ oracle_home }}"
+     remote_src=no
+     mode=0775
+     group="{{ oracle_install_group }}"
+     owner="{{ oracle_user }}"
+  tags:
+   - db19c_unpackdbsoftware
+
+- name: Setup Oracle 19c Database Software silent response file
+  when: inventory_hostname in groups['dbservers']
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ oracle_user }}"
+  template: src=roles/dbsoftware19c_install/templates/{{ oradbsoft_rsp }}.rsp.j2 dest={{ stage_dir }}/{{ oradbsoft_rsp }}.rsp mode=0755
+  tags:
+   - db19c_setuprspfile
+
+- name: Install Oracle 19c Database Software
+  when: inventory_hostname in groups['dbservers']
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ oracle_user }}"
+  shell: "{{ oracle_home }}/runInstaller -silent -responseFile {{ stage_dir }}/{{ oradbsoft_rsp }}.rsp -noconfig -ignorePrereqFailure"
+  ignore_errors: True
+  tags:
+   - dbsoft19c_install
+
+- name: Execute orainstroot.sh
+  when: inventory_hostname in groups['dbservers'] 
+  remote_user: "{{ root_user }}"
+  shell: "{{ oracle_inventory }}/orainstRoot.sh" 
+  ignore_errors: True
+  tags:
+   - db19c_exeorainstroot
+
+- name: Execute root.sh
+  when: inventory_hostname in groups['dbservers']
+  remote_user: "{{ root_user }}"
+  shell: "{{ oracle_home }}/root.sh -silent"
+  tags:
+   - db19c_exeroot
+
+- name: Remove stage directory 
+  when: inventory_hostname in groups['dbservers']
+  file: path={{ stage_dir }} state=absent
+
+- name: display post install message
+  debug:
+    msg:
+      - 'This Steps completed below task for Single Instance at {{ansible_date_time.iso8601}}:'
+      - '- Install Single Instance Oracle Database Software'
+      - 'Next Steps left to do:'
+      - '- Create SI empty Container Database on server ora-x1'
+      - '- Create SI Pluggable Database on server ora-x1'
+      - '- Deinstall Single Instance Oracle Database Software'
+      - '- END OF ALL: git clone of OracleDBAwithAnsible repository will be shared'
