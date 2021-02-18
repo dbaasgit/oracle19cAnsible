@@ -31,14 +31,7 @@ Oracle DBA - Automation with Ansible (Install Oracle 19c Database Software)
 
 ### Summary commands: 
 
-1. Clone this repository:
-   git clone https://github.com/asiandevs/OracleDBAwithAnsible
 
-2. Stage the following Oracle Software on the control machine
-> Oracle Database 19c (19.3) for Linux x86-64 [ LINUX.X64_193000_db_home.zip ]
-> https://www.oracle.com/technetwork/database/enterprise-edition/downloads/oracle19c-linux-5462157.html
-
-3. Configure an Ansible inventory file (example as below) 
 
 ```
 [root@oel75 ansible]# cat ansible.cfg | grep inventory
